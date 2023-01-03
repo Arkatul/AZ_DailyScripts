@@ -9,8 +9,6 @@ Usage : $(basename "$0") --vault-name [kv-source] (--secrets scr1,scr2,scr3)
 where params are :
     --help                                      This help
     (mandatory) -v|--vault [value]              Keyvault name
-    (optional)  -s|--secrets                    Secrets list
-                                                If ommitted, shows all secrets
     (optional)  --debug                         Shows debugging info
   "
 while [[ $# -gt 0 ]]
@@ -23,11 +21,6 @@ case $key in
     ;;
     -v|--vault-name)
     KV="$2"
-    shift # past argument
-    shift # past value
-    ;;
-    -s|--secrets)
-    SECRETS="$2"
     shift # past argument
     shift # past value
     ;;
@@ -44,21 +37,17 @@ done
 if [ $debug == "Y" ];
 then
     echo " KV : ${KV}"
-    echo " SECRETS : ${SECRETS}"
 fi
-set -- "${POSITIONAL[@]}" # restore positional parameters
-echo "Querying Azure for $KV secrets list..."
-if [ -z ${SECRETS+x} ];
+if [ $debug == "Y" ];
 then
-    SRCSCRLIST=$(az keyvault secret list --vault-name $KV -o tsv --query [].name)
-    readarray -t SRCSCRARR <<<"$SRCSCRLIST"
-else
-    IFS=','
-    read -a SRCSCRARR <<< $SECRETS
-    IFS=' '
+    echo "Commands to be executed : "
+    for secret in $(az keyvault \secret list --vault-name $KV -o tsv --query [].name); do
+        secret=$(tr -dc '[[:print:]]' <<< "$secret")
+        echo "az keyvault secret show --vault-name "${KV}" -n "${secret}" -o tsv --query "value""
+    done
 fi
-for i in "${SRCSCRARR[@]}"; do
-    printf "Reading ${i} value ..."
-    SCRVAL=$(az keyvault secret show --vault-name $KV -n ${i} -o tsv --query value)
-        printf " ${i} : ${SCRVAL}"
+for secret in $(az keyvault \secret list --vault-name $KV -o tsv --query [].name); do
+    secret=$(tr -dc '[[:print:]]' <<< "$secret")
+    value=$(az keyvault secret show --vault-name "${KV}" -n "${secret}" -o tsv --query "value")
+    printf "${secret}\t : ${value}\n"
 done
